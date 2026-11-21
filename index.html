@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SKATE Payment</title>
+<style>
+  :root { --green:#1e9b3b; --blue:#0070d2; --grey:#5a6672; --ink:#111; --bg:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --green:#3cc45c; --blue:#4da3ff; --grey:#a9b3bd; --ink:#f2f2f2; --bg:#121212; }
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); }
+  body {
+    font-family:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    color:var(--ink); display:flex; align-items:center; justify-content:center;
+    padding:24px 20px; text-align:center;
+  }
+  main { width:100%; max-width:420px; }
+  svg { width:72px; height:72px; display:block; margin:0 auto 14px; }
+  h1 { margin:0 0 6px; font-size:34px; line-height:1.15; color:var(--green); font-weight:700; }
+  .thanks { margin:0 0 30px; font-size:20px; font-weight:700; }
+  .label { margin:0 0 4px; font-size:17px; color:var(--grey); }
+  .amount { margin:0 0 10px; font-size:52px; line-height:1.1; font-weight:700; color:var(--blue); word-break:break-word; }
+  .order { margin:0 0 34px; font-size:16px; color:var(--grey); word-break:break-word; }
+  .note { margin:0; font-size:17px; color:var(--green); font-weight:600; line-height:1.4; }
+  .small { margin:10px 0 0; font-size:13px; color:var(--grey); }
+  .bad h1, .bad .note { color:#d32f2f; }
+  .wait h1 { color:var(--grey); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main id="box" class="wait">
+  <svg id="icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 34 L26 48 L53 17" style="color:var(--green)"/></svg>
+  <h1 id="title">Confirming payment...</h1>
+  <p class="thanks" id="thanks" hidden>Thank You!</p>
+  <div id="details" hidden>
+    <p class="label">Total amount paid</p>
+    <p class="amount" id="amount"></p>
+    <p class="order" id="order"></p>
+  </div>
+  <p class="note" id="note">Please wait a moment.</p>
+  <p class="small">This is a school project simulation. No real money is taken.</p>
+</main>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var topic = q.get("t") || "";
+  var order = (q.get("o") || "").slice(0, 40);
+  var amt = parseFloat(q.get("a"));
+  var box = document.getElementById("box");
+
+  function $(id) { return document.getElementById(id); }
+
+  function fail(title, note) {
+    box.className = "bad";
+    $("icon").hidden = true;
+    $("title").textContent = title;
+    $("note").textContent = note;
+  }
+
+  function success() {
+    box.className = "";
+    $("title").textContent = "Payment Successful";
+    $("thanks").hidden = false;
+    $("amount").textContent = "RM " + amt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $("order").textContent = "Order No: " + order;
+    $("details").hidden = false;
+    $("note").textContent = "Go back to the SKATE app. You can close this page.";
+  }
+
+  // the topic must look exactly like the ones the SKATE app makes, nothing else can be posted to
+  if (!/^skatepay[0-9a-f]{24}$/.test(topic) || !isFinite(amt) || amt < 0 || amt > 10000000 || !order) {
+    fail("Invalid payment link", "Please scan the QR code in the SKATE app again.");
+    return;
+  }
+
+  function send(tries) {
+    fetch("https://ntfy.sh/" + topic, { method: "POST", body: "paid " + order })
+      .then(function (r) { if (!r.ok) { throw new Error("bad status"); } success(); })
+      .catch(function () {
+        if (tries > 1) { setTimeout(function () { send(tries - 1); }, 1200); }
+        else { fail("Could not confirm", "Check your internet and scan the QR code again."); }
+      });
+  }
+  send(3);
+})();
+</script>
+</body>
+</html>
